@@ -14,10 +14,11 @@ UniState is an architectural framework for Unity, designed around State pattern.
 - [Framework Philosophy](#framework-philosophy)
   + [Dependency Injection](#dependency-injection)
 - [API Details and Usage](#api-details-and-usage)
-    * [States](#states)
+    * [State](#state)
         + [State Creating](#state-creating)
         + [State Lifecycle](#state-lifecycle)
         + [State Transitions](#state-transitions)
+        + [Disposables](#disposables)
         + [State Behavior Attribute](#state-behavior-attribute)
     * [State Machine](#state-machine)
         + [Creating a State Machine](#creating-a-state-machine)
@@ -185,7 +186,7 @@ Dependencies must be registered in your DI framework, and they will automaticall
 
 ## API Details and Usage
  
-### States
+### State
 
 A state is a fundamental unit of logic in an application, often representing different screens or states, such as an idle scene, main menu, popup, or a specific state of a popup.
 
@@ -308,6 +309,43 @@ public class ExampleState : StateBase
     {
         // Some logic here
         return UniTask.FromResult(TransitionExample.GoTo);
+    }
+}
+```
+
+#### Disposables
+
+Disposables are a part of `StateBase` that allow users to tie `IDisposable` references and delegates to state's lifetime, guaranteeing disposal and delegate execution on state's `Dispose`, without overriding the method
+```csharp
+public class LoadingState : StateBase<ILoadingScreenView>
+{
+    private CancellationTokenSource _loadingCts;
+
+    public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        // State's disposable references
+        _loadingCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        Disposables.Add(_loadingCts);
+
+        // Handling of subscriptions with locality of behaviour
+        Payload.CancelClicked += OnCancelLoadingClicked;        
+        Disposables.Add(() => Payload.CancelClicked -= OnCancelLoadingClicked);
+
+        try
+        {
+            await Payload.PretendToWork(_loadingCts.Token);
+        }
+        catch (OperationCancelledException) when (!token.IsCancellationRequested)
+        {
+            return Transition.GoBack();
+        }
+
+        return Transition.GoTo<NextState>();
+    }
+    
+    private void OnCancelLoadingClicked()
+    {
+        _loadingCts.Cancel();
     }
 }
 ```
