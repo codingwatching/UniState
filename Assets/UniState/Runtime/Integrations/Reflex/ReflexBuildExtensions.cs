@@ -1,28 +1,21 @@
 ﻿#if UNISTATE_REFLEX_SUPPORT
 
 using System;
-using System.Linq;
-using System.Reflection;
+using System.Collections.Generic;
 using Reflex.Core;
+using Reflex.Enums;
+using Reflex.Resolvers;
 
 namespace UniState
 {
     public static class ReflexBuildExtensions
     {
-        private static readonly MethodInfo AddTransientFactoryMethod = GetFactoryRegistrationMethod(nameof(ContainerBuilder.AddTransient));
-        private static readonly MethodInfo AddSingletonFactoryMethod = GetFactoryRegistrationMethod(nameof(ContainerBuilder.AddSingleton));
-        private static readonly MethodInfo CreateStateMachineFactoryMethod =
-            typeof(ReflexBuildExtensions).GetMethod(nameof(CreateStateMachineFactory), BindingFlags.NonPublic | BindingFlags.Static);
-
         public static void AddStateMachine(
             this ContainerBuilder builder,
             Type stateMachineImplementation,
             Type stateMachineContract)
         {
-            ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
-
-            builder.AddTransient(stateMachineImplementation);
-            RegisterStateMachineFactory(builder, stateMachineImplementation, stateMachineContract, AddTransientFactoryMethod);
+            AddStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, Lifetime.Transient);
         }
 
         public static void AddSingletonStateMachine(
@@ -30,10 +23,7 @@ namespace UniState
             Type stateMachineImplementation,
             Type stateMachineContract)
         {
-            ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
-
-            builder.AddSingleton(stateMachineImplementation);
-            RegisterStateMachineFactory(builder, stateMachineImplementation, stateMachineContract, AddSingletonFactoryMethod);
+            AddStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, Lifetime.Singleton);
         }
 
         public static void AddState(this ContainerBuilder builder, Type state)
@@ -109,39 +99,70 @@ namespace UniState
             }
         }
 
-        private static void RegisterStateMachineFactory(
+        private static void AddStateMachineInternal(
             ContainerBuilder builder,
             Type stateMachineImplementation,
             Type stateMachineContract,
-            MethodInfo registrationMethod)
+            Lifetime lifetime)
         {
-            var closedFactoryMethod = CreateStateMachineFactoryMethod.MakeGenericMethod(stateMachineImplementation);
-            var factoryType = typeof(Func<,>).MakeGenericType(typeof(Container), stateMachineImplementation);
-            var factory = Delegate.CreateDelegate(factoryType, closedFactoryMethod);
-            var closedRegistrationMethod = registrationMethod.MakeGenericMethod(stateMachineImplementation);
+            ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
 
-            closedRegistrationMethod.Invoke(builder, new object[] { factory, new[] { stateMachineContract } });
+            builder.Bindings.Add(Binding.Validated(
+                new ReflexStateMachineResolver(stateMachineImplementation, lifetime),
+                stateMachineImplementation,
+                stateMachineImplementation,
+                stateMachineContract));
         }
 
-        private static TStateMachine CreateStateMachineFactory<TStateMachine>(Container container)
-            where TStateMachine : class, IStateMachine
+        private sealed class ReflexStateMachineResolver : IResolver
         {
-            var stateMachine = container.Resolve<TStateMachine>();
-            stateMachine.SetResolver(container.ToTypeResolver());
+            private readonly Type _stateMachineImplementation;
+            private readonly Lifetime _lifetime;
+            private readonly List<IDisposable> _disposables = new();
 
-            return stateMachine;
-        }
+            private object _instance;
 
-        private static MethodInfo GetFactoryRegistrationMethod(string methodName)
-        {
-            return typeof(ContainerBuilder)
-                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                .Single(method =>
-                    method.Name == methodName &&
-                    method.IsGenericMethodDefinition &&
-                    method.GetParameters().Length == 2 &&
-                    method.GetParameters()[0].ParameterType.IsGenericType &&
-                    method.GetParameters()[0].ParameterType.GetGenericTypeDefinition() == typeof(Func<,>));
+            public Lifetime Lifetime => _lifetime;
+
+            public ReflexStateMachineResolver(Type stateMachineImplementation, Lifetime lifetime)
+            {
+                _stateMachineImplementation = stateMachineImplementation;
+                _lifetime = lifetime;
+            }
+
+            public object Resolve(Container container)
+            {
+                if (_lifetime == Lifetime.Singleton && _instance != null)
+                {
+                    return _instance;
+                }
+
+                var stateMachine = (IStateMachine)container.Construct(_stateMachineImplementation);
+                stateMachine.SetResolver(container.ToTypeResolver());
+
+                if (_lifetime == Lifetime.Singleton)
+                {
+                    _instance = stateMachine;
+                }
+
+                if (stateMachine is IDisposable disposable)
+                {
+                    _disposables.Add(disposable);
+                }
+
+                return stateMachine;
+            }
+
+            public void Dispose()
+            {
+                for (var i = _disposables.Count - 1; i >= 0; i--)
+                {
+                    _disposables[i].Dispose();
+                }
+
+                _disposables.Clear();
+                _instance = null;
+            }
         }
     }
 }
