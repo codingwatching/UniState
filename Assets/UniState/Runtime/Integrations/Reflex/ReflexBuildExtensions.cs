@@ -1,12 +1,19 @@
 ﻿#if UNISTATE_REFLEX_SUPPORT
 
 using System;
+using System.Linq;
+using System.Reflection;
 using Reflex.Core;
 
 namespace UniState
 {
     public static class ReflexBuildExtensions
     {
+        private static readonly MethodInfo AddTransientFactoryMethod = GetFactoryRegistrationMethod(nameof(ContainerBuilder.AddTransient));
+        private static readonly MethodInfo AddSingletonFactoryMethod = GetFactoryRegistrationMethod(nameof(ContainerBuilder.AddSingleton));
+        private static readonly MethodInfo CreateStateMachineFactoryMethod =
+            typeof(ReflexBuildExtensions).GetMethod(nameof(CreateStateMachineFactory), BindingFlags.NonPublic | BindingFlags.Static);
+
         public static void AddStateMachine(
             this ContainerBuilder builder,
             Type stateMachineImplementation,
@@ -15,13 +22,7 @@ namespace UniState
             ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
 
             builder.AddTransient(stateMachineImplementation);
-            builder.AddTransient(container =>
-            {
-                var stateMachine = (IStateMachine)container.Resolve(stateMachineImplementation);
-                stateMachine.SetResolver(container.ToTypeResolver());
-
-                return stateMachine;
-            }, stateMachineContract);
+            RegisterStateMachineFactory(builder, stateMachineImplementation, stateMachineContract, AddTransientFactoryMethod);
         }
 
         public static void AddSingletonStateMachine(
@@ -32,13 +33,7 @@ namespace UniState
             ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
 
             builder.AddSingleton(stateMachineImplementation);
-            builder.AddSingleton(container =>
-            {
-                var stateMachine = (IStateMachine)container.Resolve(stateMachineImplementation);
-                stateMachine.SetResolver(container.ToTypeResolver());
-
-                return stateMachine;
-            }, stateMachineContract);
+            RegisterStateMachineFactory(builder, stateMachineImplementation, stateMachineContract, AddSingletonFactoryMethod);
         }
 
         public static void AddState(this ContainerBuilder builder, Type state)
@@ -112,6 +107,41 @@ namespace UniState
                     $"AddStateMachine: Type {stateMachineContract.Name} " +
                     $"must implement IStateMachine.");
             }
+        }
+
+        private static void RegisterStateMachineFactory(
+            ContainerBuilder builder,
+            Type stateMachineImplementation,
+            Type stateMachineContract,
+            MethodInfo registrationMethod)
+        {
+            var closedFactoryMethod = CreateStateMachineFactoryMethod.MakeGenericMethod(stateMachineImplementation);
+            var factoryType = typeof(Func<,>).MakeGenericType(typeof(Container), stateMachineImplementation);
+            var factory = Delegate.CreateDelegate(factoryType, closedFactoryMethod);
+            var closedRegistrationMethod = registrationMethod.MakeGenericMethod(stateMachineImplementation);
+
+            closedRegistrationMethod.Invoke(builder, new object[] { factory, new[] { stateMachineContract } });
+        }
+
+        private static TStateMachine CreateStateMachineFactory<TStateMachine>(Container container)
+            where TStateMachine : class, IStateMachine
+        {
+            var stateMachine = container.Resolve<TStateMachine>();
+            stateMachine.SetResolver(container.ToTypeResolver());
+
+            return stateMachine;
+        }
+
+        private static MethodInfo GetFactoryRegistrationMethod(string methodName)
+        {
+            return typeof(ContainerBuilder)
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Single(method =>
+                    method.Name == methodName &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters().Length == 2 &&
+                    method.GetParameters()[0].ParameterType.IsGenericType &&
+                    method.GetParameters()[0].ParameterType.GetGenericTypeDefinition() == typeof(Func<,>));
         }
     }
 }

@@ -6,6 +6,7 @@
     "UniTask",
     "UnityEditor.TestRunner",
     "UnityEngine.TestRunner",
+    "Reflex",
     "VContainer",
     "Zenject"
   ],
