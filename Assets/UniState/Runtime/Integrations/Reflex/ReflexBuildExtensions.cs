@@ -30,7 +30,7 @@ namespace UniState
         {
             ValidateStateBindingInput(state);
 
-            builder.AddTransient(state);
+            builder.AddTransient(state, GetStateContracts(state));
         }
 
         public static void AddState(this ContainerBuilder builder, Type stateImplementation, Type stateContract)
@@ -44,7 +44,7 @@ namespace UniState
         {
             ValidateStateBindingInput(state);
 
-            builder.AddSingleton(state);
+            builder.AddSingleton(state, GetStateContracts(state));
         }
 
         public static void AddSingletonState(this ContainerBuilder builder, Type stateImplementation,
@@ -73,6 +73,20 @@ namespace UniState
                 throw new ArgumentException(
                     $"AddState({state.Name}): Type parameter state must implement IState<TPayload>");
             }
+        }
+
+        private static Type[] GetStateContracts(Type state)
+        {
+            var interfaces = state.GetInterfaces();
+            var contracts = new Type[interfaces.Length + 1];
+            contracts[0] = state;
+
+            for (var i = 0; i < interfaces.Length; i++)
+            {
+                contracts[i + 1] = interfaces[i];
+            }
+
+            return contracts;
         }
 
         private static void ValidateStateMachineBindingInput(Type stateMachineImplementation, Type stateMachineContract)

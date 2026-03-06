@@ -28,7 +28,6 @@ namespace UniStateTests.PlayMode.GoToStateTests
             builder.AddState(typeof(StateGoTo3));
             builder.AddState(typeof(StateGoTo3), typeof(StateGoToAbstract3));
             builder.AddState(typeof(StateGoTo4));
-            builder.AddState(typeof(StateGoTo4), typeof(IStateGoTo4));
             builder.AddState(typeof(StateGoTo5));
             builder.AddState(typeof(CompositeStateGoTo6));
             builder.AddState(typeof(SubStateGoTo6First));
@@ -37,7 +36,6 @@ namespace UniStateTests.PlayMode.GoToStateTests
             builder.AddState(typeof(SubStateGoTo7First));
             builder.AddState(typeof(SubStateGoTo7Second));
             builder.AddState(typeof(StateGoTo8));
-            builder.AddState(typeof(StateGoTo8), typeof(IStateGoTo8));
         }
     }
 }
