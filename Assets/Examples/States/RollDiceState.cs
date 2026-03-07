@@ -15,7 +15,7 @@ namespace Examples.States
 
             await UniTask.Delay(TimeSpan.FromSeconds(2), cancellationToken: token);
 
-            var dice = Random.Range(0, 7);
+            var dice = Random.Range(1, 7);
 
             Debug.Log($"Dice is {dice}");
 
