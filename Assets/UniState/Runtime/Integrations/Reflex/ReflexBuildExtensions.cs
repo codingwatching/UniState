@@ -1,7 +1,10 @@
 ﻿#if UNISTATE_REFLEX_SUPPORT
 
 using System;
+using System.Collections.Generic;
 using Reflex.Core;
+using Reflex.Enums;
+using Reflex.Resolvers;
 
 namespace UniState
 {
@@ -12,16 +15,7 @@ namespace UniState
             Type stateMachineImplementation,
             Type stateMachineContract)
         {
-            ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
-
-            builder.AddTransient(stateMachineImplementation);
-            builder.AddTransient(container =>
-            {
-                var stateMachine = (IStateMachine)container.Resolve(stateMachineImplementation);
-                stateMachine.SetResolver(container.ToTypeResolver());
-
-                return stateMachine;
-            }, stateMachineContract);
+            AddStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, Lifetime.Transient);
         }
 
         public static void AddSingletonStateMachine(
@@ -29,23 +23,14 @@ namespace UniState
             Type stateMachineImplementation,
             Type stateMachineContract)
         {
-            ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
-
-            builder.AddSingleton(stateMachineImplementation);
-            builder.AddSingleton(container =>
-            {
-                var stateMachine = (IStateMachine)container.Resolve(stateMachineImplementation);
-                stateMachine.SetResolver(container.ToTypeResolver());
-
-                return stateMachine;
-            }, stateMachineContract);
+            AddStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, Lifetime.Singleton);
         }
 
         public static void AddState(this ContainerBuilder builder, Type state)
         {
             ValidateStateBindingInput(state);
 
-            builder.AddTransient(state);
+            builder.AddTransient(state, GetStateContracts(state));
         }
 
         public static void AddState(this ContainerBuilder builder, Type stateImplementation, Type stateContract)
@@ -59,7 +44,7 @@ namespace UniState
         {
             ValidateStateBindingInput(state);
 
-            builder.AddSingleton(state);
+            builder.AddSingleton(state, GetStateContracts(state));
         }
 
         public static void AddSingletonState(this ContainerBuilder builder, Type stateImplementation,
@@ -90,6 +75,20 @@ namespace UniState
             }
         }
 
+        private static Type[] GetStateContracts(Type state)
+        {
+            var interfaces = state.GetInterfaces();
+            var contracts = new Type[interfaces.Length + 1];
+            contracts[0] = state;
+
+            for (var i = 0; i < interfaces.Length; i++)
+            {
+                contracts[i + 1] = interfaces[i];
+            }
+
+            return contracts;
+        }
+
         private static void ValidateStateMachineBindingInput(Type stateMachineImplementation, Type stateMachineContract)
         {
             if (stateMachineImplementation == stateMachineContract)
@@ -111,6 +110,72 @@ namespace UniState
                 throw new ArgumentException(
                     $"AddStateMachine: Type {stateMachineContract.Name} " +
                     $"must implement IStateMachine.");
+            }
+        }
+
+        private static void AddStateMachineInternal(
+            ContainerBuilder builder,
+            Type stateMachineImplementation,
+            Type stateMachineContract,
+            Lifetime lifetime)
+        {
+            ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
+
+            builder.Bindings.Add(Binding.Validated(
+                new ReflexStateMachineResolver(stateMachineImplementation, lifetime),
+                stateMachineImplementation,
+                stateMachineImplementation,
+                stateMachineContract));
+        }
+
+        private sealed class ReflexStateMachineResolver : IResolver
+        {
+            private readonly Type _stateMachineImplementation;
+            private readonly Lifetime _lifetime;
+            private readonly List<IDisposable> _disposables = new();
+
+            private object _instance;
+
+            public Lifetime Lifetime => _lifetime;
+
+            public ReflexStateMachineResolver(Type stateMachineImplementation, Lifetime lifetime)
+            {
+                _stateMachineImplementation = stateMachineImplementation;
+                _lifetime = lifetime;
+            }
+
+            public object Resolve(Container container)
+            {
+                if (_lifetime == Lifetime.Singleton && _instance != null)
+                {
+                    return _instance;
+                }
+
+                var stateMachine = (IStateMachine)container.Construct(_stateMachineImplementation);
+                stateMachine.SetResolver(container.ToTypeResolver());
+
+                if (_lifetime == Lifetime.Singleton)
+                {
+                    _instance = stateMachine;
+                }
+
+                if (stateMachine is IDisposable disposable)
+                {
+                    _disposables.Add(disposable);
+                }
+
+                return stateMachine;
+            }
+
+            public void Dispose()
+            {
+                for (var i = _disposables.Count - 1; i >= 0; i--)
+                {
+                    _disposables[i].Dispose();
+                }
+
+                _disposables.Clear();
+                _instance = null;
             }
         }
     }

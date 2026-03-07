@@ -1146,8 +1146,6 @@ private void BindStates(DiContainer container)
 
 ### Reflex
 
-> **Note:** The Reflex integration is experimental, not fully tested, and subject to change.
-
 GitHub: [Reflex](https://github.com/gustavopsantos/Reflex)
 
 #### Reflex Preparation
@@ -1192,6 +1190,9 @@ namespace Examples.Infrastructure.Reflex
 All state machines, states, and their dependencies should be registered in the DI container using Reflex's
 `ContainerBuilder`. Special extension methods have been provided for convenient registration.
 
+`AddState(typeof(MyState))` and `AddSingletonState(typeof(MyState))` register the state as itself and as all implemented
+interfaces. Use the two-parameter overload when you need to expose an additional abstract/base contract explicitly.
+
 Here's example code demonstrating the available extension methods:
 
 ```csharp
@@ -1204,13 +1205,13 @@ private void RegisterStates(ContainerBuilder builder)
 
     builder.AddStateMachine(typeof(StateMachine), typeof(IStateMachine));
     builder.AddState(typeof(BarState));
-    builder.AddState(typeof(BarState), typeof(IBarState));
+    builder.AddState(typeof(BarState), typeof(BarBaseState));
     
     // Singleton version (use cautiously, not recommended in most cases)
 
     builder.AddSingletonStateMachine(typeof(StateMachine), typeof(IStateMachine));
     builder.AddSingletonState(typeof(BarState));
-    builder.AddSingletonState(typeof(BarState), typeof(IBarState));
+    builder.AddSingletonState(typeof(BarState), typeof(BarBaseState));
 }
 ```
 
