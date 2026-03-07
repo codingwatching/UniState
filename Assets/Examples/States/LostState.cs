@@ -10,7 +10,7 @@ namespace Examples.States
     {
         public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
         {
-            Debug.Log("You lost. You will have a another chance in...");
+            Debug.Log("You lost. You will have another chance in...");
 
             Debug.Log("3 seconds");
             await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: token);

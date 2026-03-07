@@ -21,7 +21,7 @@ pattern or be used to address specific tasks.
 * **Flexibility**: everything in framework core is an abstraction. Can be replaced with your own implementation,
   see [state creating](#state-creating) and [creating a state machine](#creating-a-state-machine) sections for details.
 * **Testability**: UniState is designed to be testable. All abstractions use interfaces that can be easily mocked with
-  [NSubstitutes](https://nsubstitute.github.io/) or any other framework. States can be run separately for testing
+  [NSubstitute](https://nsubstitute.github.io/) or any other framework. States can be run separately for testing
   purposes.
 * **DI friendly**: has [integration](#integrations) with most popular DI containers
 * **Continuous Testing**: fully covered by tests. All tests run [automatically](https://github.com/bazyleu/UniState/actions) to verify each change.
@@ -138,14 +138,14 @@ Additional information on DI configuration is available [here](#integrations).
 
         public void Start()
         {
-            _stateMachine.Execute<StartGameState>(CancellationToken.None).Forget();
+            _stateMachine.Execute<MainMenuState>(CancellationToken.None).Forget();
         }
     }
 ```
 More details on running the state machine can be found [here](#running-a-state-machine).
 
-That is it! Your first project with UniState is set up. In [tutorials](#tutorials) section more detailed tutorial can be
-found.
+That's it! Your first UniState project is set up. You can find a more detailed walkthrough in the
+[tutorials](#tutorials) section.
 
 ## Installation
 
@@ -160,7 +160,7 @@ found.
 You can add `https://github.com/bazyleu/UniState.git?path=Assets/UniState` to Package Manager.
 
 It is a good practice to specify target version, UniState uses the `*.*.*` release tag so you can specify a version
-like `#1.8.0`. For example `https://github.com/bazyleu/UniState.git?path=Assets/UniState#1.8.0`.
+like `#1.9.0`. For example `https://github.com/bazyleu/UniState.git?path=Assets/UniState#1.9.0`.
 You can find latest version number [here](https://github.com/bazyleu/UniState/releases).
 
 ![image](https://github.com/user-attachments/assets/120e6750-1f33-44f7-99c8-a3e7fa166d21)
@@ -169,7 +169,7 @@ You can find latest version number [here](https://github.com/bazyleu/UniState/re
 ### Option 2: Add via manifest.json
 
 You can add `"com.bazyleu.unistate": "https://github.com/bazyleu/UniState.git?path=Assets/UniState"` (or with version
-tag `https://github.com/bazyleu/UniState.git?path=Assets/UniState#1.8.0`) to `Packages/manifest.json`.
+tag `https://github.com/bazyleu/UniState.git?path=Assets/UniState#1.9.0`) to `Packages/manifest.json`.
 
 ## Performance
 
@@ -179,7 +179,7 @@ and up to a 10x reduction in allocations.
 
 For typical scenarios involving small to medium state chains - the most common use case - UniState can reduce memory
 allocations by a factor ranging between 2x and 10x. In cases where state chains exceed 200 states, the benefits in
-memory allocation become less pronounced but execution speed remain consistent with 5000x+ boost.
+memory allocation become less pronounced, but execution speed remains consistent with a 5000x+ boost.
 
 Measurements for Windows PC (with IL2CPP scripting backend):
 ```
@@ -228,8 +228,8 @@ which were mentioned above support this, and you can choose any based on your pr
 outside the scope of UniState.
 
 ```csharp
-    //Popup prefab (Monobehaviour, view)
-    public class SimplePopupView : ISimplePopupView, Monobehaviour
+    // Popup prefab (MonoBehaviour, view)
+    public class SimplePopupView : ISimplePopupView, MonoBehaviour
     {
         //...
     }
@@ -242,7 +242,7 @@ outside the scope of UniState.
         public override async UniTask Initialize(CancellationToken token) 
         {
             _view = LoadPopupView(token);
-            Disposables.Add(UnloadShopView);
+            Disposables.Add(UnloadPopupView);
         }
     
         public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
@@ -259,12 +259,12 @@ outside the scope of UniState.
         }
 
         // The implementation of this method depends on other frameworks/patterns used in the project.
-        private ISimplePopupView LoadShopView(CancellationToken token)
+        private ISimplePopupView LoadPopupView(CancellationToken token)
         {
              // Loading logic
         }
         
-        private void UnloadShopView()
+        private void UnloadPopupView()
         {
              // Unloading logic
         }
@@ -295,7 +295,7 @@ state machine, ensuring they are properly cleaned up after the state machine exi
             
             // Run the internal state machine for ShopPopup.
             // In all states inside this state machine, all resources allocated in this state will be available.
-            await stateMachine.Execute<ShopPopupIdleState>(cts.Token);
+            await stateMachine.Execute<ShopPopupIdleState>(token);
 
             return Transition.GoBack();
         }
@@ -618,11 +618,11 @@ public class RootGameplayState : StateBase
     private readonly IStateMachine _uiMachine;
     private readonly IStateMachine _logicMachine;
 
-    public GameplayState(IStateMachine uiMachine,
-                         IStateMachine logicMachine)
+    public RootGameplayState(IStateMachine uiMachine,
+                             IStateMachine logicMachine)
     {
         _uiMachine = uiMachine;
-        _logicMachine = _logicMachine;
+        _logicMachine = logicMachine;
     }
 
     public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
@@ -904,7 +904,7 @@ Each state inherits from **`StateBase`** and returns a transition that drives th
             Debug.Log("Need to roll 5+. Rolling the dice...");
             await UniTask.Delay(TimeSpan.FromSeconds(2), cancellationToken: token);
 
-            var dice = Random.Range(0, 7);
+            var dice = Random.Range(1, 7);
             Debug.Log($"Dice is {dice}");
 
             if (dice > 4)
@@ -919,7 +919,7 @@ Each state inherits from **`StateBase`** and returns a transition that drives th
     {
         public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
         {
-            Debug.Log("You lost. You will have a another chance in...");
+            Debug.Log("You lost. You will have another chance in...");
 
             Debug.Log("3 seconds");
             await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: token);
@@ -948,8 +948,7 @@ Each state inherits from **`StateBase`** and returns a transition that drives th
 
 #### Step 2: Create entry point
 
-DiceEntryPoint runs on scene start, converts IObjectResolver into an ITypeResolver, creates the state machine, and runs
-StartGameState.
+DiceEntryPoint runs on scene start, resolves the state machine, and runs StartGameState.
 
 ```csharp
     public class DiceEntryPoint : IStartable
@@ -971,7 +970,7 @@ StartGameState.
 #### Step 3: Configure VContainer
 
 DiceScope is a LifetimeScope that registers the state machine and all states.
-The helper extensions RegisterStateMachine and RegisterState is used for registering.
+The helper extensions RegisterStateMachine and RegisterState are used for registering.
 Note that for a state machine you must register an interface (or abstract class) and an implementation, and resolve the
 interface, not the implementation.
 
