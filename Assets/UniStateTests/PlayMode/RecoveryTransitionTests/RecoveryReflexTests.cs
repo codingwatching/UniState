@@ -2,6 +2,7 @@ using System.Collections;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 using UniStateTests.Common;
 using UniStateTests.PlayMode.RecoveryTransitionTests.Infrastructure;
@@ -28,14 +29,14 @@ namespace UniStateTests.PlayMode.RecoveryTransitionTests
         {
             base.SetupBindings(builder);
 
-            builder.AddSingleton(typeof(RecoveryTestHelper));
-            builder.AddStateMachine(typeof(StateMachineDefaultRecovery), typeof(IStateMachineDefaultRecovery));
-            builder.AddStateMachine(typeof(StateMachineGoToStateRecovery), typeof(IStateMachineGoToStateRecovery));
-            builder.AddStateMachine(typeof(StateMachineExitRecovery), typeof(IStateMachineExitRecovery));
-            builder.AddState(typeof(StateInitial));
-            builder.AddState(typeof(StateThrowTwoException));
-            builder.AddState(typeof(StateWithFailExecution));
-            builder.AddState(typeof(StateStartedAfterException));
+            builder.RegisterType(typeof(RecoveryTestHelper), Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterStateMachine(typeof(StateMachineDefaultRecovery), typeof(IStateMachineDefaultRecovery));
+            builder.RegisterStateMachine(typeof(StateMachineGoToStateRecovery), typeof(IStateMachineGoToStateRecovery));
+            builder.RegisterStateMachine(typeof(StateMachineExitRecovery), typeof(IStateMachineExitRecovery));
+            builder.RegisterState(typeof(StateInitial));
+            builder.RegisterState(typeof(StateThrowTwoException));
+            builder.RegisterState(typeof(StateWithFailExecution));
+            builder.RegisterState(typeof(StateStartedAfterException));
         }
     }
 }

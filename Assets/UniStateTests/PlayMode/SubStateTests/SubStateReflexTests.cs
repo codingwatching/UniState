@@ -20,13 +20,13 @@ namespace UniStateTests.PlayMode.SubStateTests
         {
             base.SetupBindings(builder);
 
-            builder.AddStateMachine(typeof(StateMachineSubStates), typeof(IVerifiableStateMachine));
-            builder.AddState(typeof(StateInitial));
-            builder.AddState(typeof(StateFinal));
-            builder.AddState(typeof(SubStateInitialFirst));
-            builder.AddState(typeof(SubStateInitialSecond));
-            builder.AddState(typeof(SubStateFinalFirst));
-            builder.AddState(typeof(SubStateFinalSecond));
+            builder.RegisterStateMachine(typeof(StateMachineSubStates), typeof(IVerifiableStateMachine));
+            builder.RegisterState(typeof(StateInitial));
+            builder.RegisterState(typeof(StateFinal));
+            builder.RegisterState(typeof(SubStateInitialFirst));
+            builder.RegisterState(typeof(SubStateInitialSecond));
+            builder.RegisterState(typeof(SubStateFinalFirst));
+            builder.RegisterState(typeof(SubStateFinalSecond));
         }
     }
 }

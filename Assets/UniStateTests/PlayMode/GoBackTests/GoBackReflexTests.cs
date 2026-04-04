@@ -2,6 +2,7 @@ using System.Collections;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 using UniStateTests.Common;
 using UniStateTests.PlayMode.GoBackTests.Infrastructure;
@@ -23,11 +24,11 @@ namespace UniStateTests.PlayMode.GoBackTests
         {
             base.SetupBindings(builder);
 
-            builder.AddSingleton(typeof(GoBackTestHelper));
-            builder.AddStateMachine(typeof(StateMachineGoBack), typeof(IVerifiableStateMachine));
-            builder.AddState(typeof(StateGoBackFirst));
-            builder.AddState(typeof(StateGoBackSecond));
-            builder.AddState(typeof(StateGoBackThird));
+            builder.RegisterType(typeof(GoBackTestHelper), Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterStateMachine(typeof(StateMachineGoBack), typeof(IVerifiableStateMachine));
+            builder.RegisterState(typeof(StateGoBackFirst));
+            builder.RegisterState(typeof(StateGoBackSecond));
+            builder.RegisterState(typeof(StateGoBackThird));
         }
     }
 }

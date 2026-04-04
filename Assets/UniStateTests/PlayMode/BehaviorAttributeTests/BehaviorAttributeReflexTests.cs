@@ -2,6 +2,7 @@ using System.Collections;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 using UniStateTests.Common;
 using UniStateTests.PlayMode.StateBehaviorAttributeTests.Infrastructure;
@@ -22,11 +23,11 @@ namespace UniStateTests.PlayMode.StateBehaviorAttributeTests
         {
             base.SetupBindings(builder);
 
-            builder.AddStateMachine(typeof(StateMachineBehaviourAttribute), typeof(IVerifiableStateMachine));
-            builder.AddState(typeof(FirstState));
-            builder.AddState(typeof(NoReturnState));
-            builder.AddState(typeof(FastInitializeState));
-            builder.AddSingleton(typeof(BehaviourAttributeTestHelper));
+            builder.RegisterStateMachine(typeof(StateMachineBehaviourAttribute), typeof(IVerifiableStateMachine));
+            builder.RegisterState(typeof(FirstState));
+            builder.RegisterState(typeof(NoReturnState));
+            builder.RegisterState(typeof(FastInitializeState));
+            builder.RegisterType(typeof(BehaviourAttributeTestHelper), Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

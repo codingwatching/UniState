@@ -2,6 +2,7 @@ using System.Collections;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 using UniStateTests.Common;
 using UniStateTests.PlayMode.HistoryTests.Infrastructure;
@@ -24,13 +25,13 @@ namespace UniStateTests.PlayMode.HistoryTests
         {
             base.SetupBindings(builder);
 
-            builder.AddSingleton(typeof(HistorySizeTestHelper));
-            builder.AddStateMachine(typeof(StateMachineLongHistory), typeof(IStateMachineLongHistory));
-            builder.AddStateMachine(typeof(StateMachineZeroHistory), typeof(IStateMachineZeroHistory));
-            builder.AddState(typeof(StateInitLongHistory));
-            builder.AddState(typeof(StateInitZeroHistory));
-            builder.AddState(typeof(StateFooHistory));
-            builder.AddState(typeof(StateBarHistory));
+            builder.RegisterType(typeof(HistorySizeTestHelper), Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterStateMachine(typeof(StateMachineLongHistory), typeof(IStateMachineLongHistory));
+            builder.RegisterStateMachine(typeof(StateMachineZeroHistory), typeof(IStateMachineZeroHistory));
+            builder.RegisterState(typeof(StateInitLongHistory));
+            builder.RegisterState(typeof(StateInitZeroHistory));
+            builder.RegisterState(typeof(StateFooHistory));
+            builder.RegisterState(typeof(StateBarHistory));
         }
     }
 }

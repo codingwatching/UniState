@@ -1,59 +1,94 @@
 ﻿#if UNISTATE_REFLEX_SUPPORT
 
 using System;
-using System.Collections.Generic;
 using Reflex.Core;
 using Reflex.Enums;
-using Reflex.Resolvers;
 
 namespace UniState
 {
     public static class ReflexBuildExtensions
     {
+        public static void RegisterStateMachine(
+            this ContainerBuilder builder,
+            Type stateMachineImplementation,
+            Type stateMachineContract)
+        {
+            RegisterStateMachine(builder, stateMachineImplementation, stateMachineContract, Lifetime.Transient);
+        }
+
+        public static void RegisterStateMachine(
+            this ContainerBuilder builder,
+            Type stateMachineImplementation,
+            Type stateMachineContract,
+            Lifetime lifetime)
+        {
+            RegisterStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, lifetime);
+        }
+
+        public static void RegisterState(this ContainerBuilder builder, Type state)
+        {
+            RegisterState(builder, state, Lifetime.Transient);
+        }
+
+        public static void RegisterState(this ContainerBuilder builder, Type state, Lifetime lifetime)
+        {
+            ValidateStateBindingInput(state);
+
+            builder.RegisterType(state, GetStateContracts(state), lifetime, Resolution.Lazy);
+        }
+
+        public static void RegisterState(this ContainerBuilder builder, Type stateImplementation, Type stateContract)
+        {
+            RegisterState(builder, stateImplementation, stateContract, Lifetime.Transient);
+        }
+
+        public static void RegisterState(
+            this ContainerBuilder builder,
+            Type stateImplementation,
+            Type stateContract,
+            Lifetime lifetime)
+        {
+            ValidateStateBindingInput(stateImplementation, stateContract);
+
+            builder.RegisterType(
+                stateImplementation,
+                new[] { stateContract },
+                lifetime,
+                Resolution.Lazy);
+        }
+
+        [Obsolete("Use RegisterStateMachine(builder, implementation, contract) or the overload with Lifetime.")]
         public static void AddStateMachine(
             this ContainerBuilder builder,
             Type stateMachineImplementation,
-            Type stateMachineContract)
-        {
-            AddStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, Lifetime.Transient);
-        }
+            Type stateMachineContract) =>
+            RegisterStateMachine(builder, stateMachineImplementation, stateMachineContract);
 
+        [Obsolete("Use RegisterStateMachine(builder, implementation, contract, Lifetime.Singleton) instead.")]
         public static void AddSingletonStateMachine(
             this ContainerBuilder builder,
             Type stateMachineImplementation,
-            Type stateMachineContract)
-        {
-            AddStateMachineInternal(builder, stateMachineImplementation, stateMachineContract, Lifetime.Singleton);
-        }
+            Type stateMachineContract) =>
+            RegisterStateMachine(builder, stateMachineImplementation, stateMachineContract, Lifetime.Singleton);
 
-        public static void AddState(this ContainerBuilder builder, Type state)
-        {
-            ValidateStateBindingInput(state);
+        [Obsolete("Use RegisterState(builder, state) or the overload with Lifetime.")]
+        public static void AddState(this ContainerBuilder builder, Type state) =>
+            RegisterState(builder, state);
 
-            builder.AddTransient(state, GetStateContracts(state));
-        }
+        [Obsolete("Use RegisterState(builder, implementation, contract) or the overload with Lifetime.")]
+        public static void AddState(this ContainerBuilder builder, Type stateImplementation, Type stateContract) =>
+            RegisterState(builder, stateImplementation, stateContract);
 
-        public static void AddState(this ContainerBuilder builder, Type stateImplementation, Type stateContract)
-        {
-            ValidateStateBindingInput(stateImplementation, stateContract);
+        [Obsolete("Use RegisterState(builder, state, Lifetime.Singleton) instead.")]
+        public static void AddSingletonState(this ContainerBuilder builder, Type state) =>
+            RegisterState(builder, state, Lifetime.Singleton);
 
-            builder.AddTransient(stateImplementation, stateContract);
-        }
-
-        public static void AddSingletonState(this ContainerBuilder builder, Type state)
-        {
-            ValidateStateBindingInput(state);
-
-            builder.AddSingleton(state, GetStateContracts(state));
-        }
-
-        public static void AddSingletonState(this ContainerBuilder builder, Type stateImplementation,
-            Type stateContract)
-        {
-            ValidateStateBindingInput(stateImplementation, stateContract);
-
-            builder.AddSingleton(stateImplementation, stateContract);
-        }
+        [Obsolete("Use RegisterState(builder, implementation, contract, Lifetime.Singleton) instead.")]
+        public static void AddSingletonState(
+            this ContainerBuilder builder,
+            Type stateImplementation,
+            Type stateContract) =>
+            RegisterState(builder, stateImplementation, stateContract, Lifetime.Singleton);
 
         private static void ValidateStateBindingInput(Type stateImplementation, Type stateContract)
         {
@@ -62,7 +97,7 @@ namespace UniState
             if (!stateContract.IsAssignableFrom(stateImplementation))
             {
                 throw new ArgumentException(
-                    $"AddState({stateImplementation.Name}): Type parameter state must implement {stateContract.Name}.");
+                    $"RegisterState({stateImplementation.Name}): Type parameter state must implement {stateContract.Name}.");
             }
         }
 
@@ -71,7 +106,7 @@ namespace UniState
             if (!typeof(IExecutableState).IsAssignableFrom(state))
             {
                 throw new ArgumentException(
-                    $"AddState({state.Name}): Type parameter state must implement IState<TPayload>");
+                    $"RegisterState({state.Name}): Type parameter state must implement IState<TPayload>");
             }
         }
 
@@ -94,26 +129,26 @@ namespace UniState
             if (stateMachineImplementation == stateMachineContract)
             {
                 throw new ArgumentException(
-                    $"AddStateMachine<{stateMachineImplementation.Name}>: Type parameters must differ : " +
-                    "use AddStateMachine() where stateMachineImplementation implements stateMachineContract.\");");
+                    $"RegisterStateMachine<{stateMachineImplementation.Name}>: Type parameters must differ : " +
+                    "use RegisterStateMachine() where stateMachineImplementation implements stateMachineContract.\");");
             }
 
             if (!stateMachineContract.IsAssignableFrom(stateMachineImplementation))
             {
                 throw new ArgumentException(
-                    $"AddStateMachine: Type {stateMachineImplementation.Name} " +
+                    $"RegisterStateMachine: Type {stateMachineImplementation.Name} " +
                     $"must implement {stateMachineContract.Name}.");
             }
 
             if (!typeof(IStateMachine).IsAssignableFrom(stateMachineContract))
             {
                 throw new ArgumentException(
-                    $"AddStateMachine: Type {stateMachineContract.Name} " +
+                    $"RegisterStateMachine: Type {stateMachineContract.Name} " +
                     $"must implement IStateMachine.");
             }
         }
 
-        private static void AddStateMachineInternal(
+        private static void RegisterStateMachineInternal(
             ContainerBuilder builder,
             Type stateMachineImplementation,
             Type stateMachineContract,
@@ -121,62 +156,17 @@ namespace UniState
         {
             ValidateStateMachineBindingInput(stateMachineImplementation, stateMachineContract);
 
-            builder.Bindings.Add(Binding.Validated(
-                new ReflexStateMachineResolver(stateMachineImplementation, lifetime),
+            builder.RegisterFactory(
+                container =>
+                {
+                    var stateMachine = (IStateMachine)container.Construct(stateMachineImplementation);
+                    stateMachine.SetResolver(container.ToTypeResolver());
+                    return stateMachine;
+                },
                 stateMachineImplementation,
-                stateMachineImplementation,
-                stateMachineContract));
-        }
-
-        private sealed class ReflexStateMachineResolver : IResolver
-        {
-            private readonly Type _stateMachineImplementation;
-            private readonly Lifetime _lifetime;
-            private readonly List<IDisposable> _disposables = new();
-
-            private object _instance;
-
-            public Lifetime Lifetime => _lifetime;
-
-            public ReflexStateMachineResolver(Type stateMachineImplementation, Lifetime lifetime)
-            {
-                _stateMachineImplementation = stateMachineImplementation;
-                _lifetime = lifetime;
-            }
-
-            public object Resolve(Container container)
-            {
-                if (_lifetime == Lifetime.Singleton && _instance != null)
-                {
-                    return _instance;
-                }
-
-                var stateMachine = (IStateMachine)container.Construct(_stateMachineImplementation);
-                stateMachine.SetResolver(container.ToTypeResolver());
-
-                if (_lifetime == Lifetime.Singleton)
-                {
-                    _instance = stateMachine;
-                }
-
-                if (stateMachine is IDisposable disposable)
-                {
-                    _disposables.Add(disposable);
-                }
-
-                return stateMachine;
-            }
-
-            public void Dispose()
-            {
-                for (var i = _disposables.Count - 1; i >= 0; i--)
-                {
-                    _disposables[i].Dispose();
-                }
-
-                _disposables.Clear();
-                _instance = null;
-            }
+                new[] { stateMachineImplementation, stateMachineContract },
+                lifetime,
+                Resolution.Lazy);
         }
     }
 }
