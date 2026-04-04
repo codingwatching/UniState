@@ -2,6 +2,7 @@ using System.Collections;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 using UniStateTests.Common;
 using UniStateTests.PlayMode.Execution.Infrastructure;
@@ -38,12 +39,12 @@ namespace UniStateTests.PlayMode.Execution
         {
             base.SetupBindings(builder);
 
-            builder.AddSingleton(typeof(ExecutionTestHelper));
-            builder.AddStateMachine(typeof(ExecutionStateMachine), typeof(IVerifiableStateMachine));
-            builder.AddState(typeof(FirstState));
-            builder.AddState(typeof(SecondState));
-            builder.AddState(typeof(SecondStateWithException));
-            builder.AddState(typeof(SecondStateWithWrongDependency));
+            builder.RegisterType(typeof(ExecutionTestHelper), Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterStateMachine(typeof(ExecutionStateMachine), typeof(IVerifiableStateMachine));
+            builder.RegisterState(typeof(FirstState));
+            builder.RegisterState(typeof(SecondState));
+            builder.RegisterState(typeof(SecondStateWithException));
+            builder.RegisterState(typeof(SecondStateWithWrongDependency));
         }
     }
 }

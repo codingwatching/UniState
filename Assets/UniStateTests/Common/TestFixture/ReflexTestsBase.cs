@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 
 namespace UniStateTests.Common
@@ -37,7 +38,7 @@ namespace UniStateTests.Common
 
         protected virtual void SetupBindings(ContainerBuilder builder)
         {
-            builder.AddSingleton(typeof(ExecutionLogger));
+            builder.RegisterType(typeof(ExecutionLogger), Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 using UniStateTests.Common;
 using UniStateTests.PlayMode.GoBackToTests.Infrastructure;
@@ -17,12 +18,12 @@ namespace UniStateTests.PlayMode.GoBackToTests
         {
             base.SetupBindings(builder);
 
-            builder.AddStateMachine(typeof(GoBackToStateMachine), typeof(IVerifiableStateMachine));
-            builder.AddState(typeof(GoBackToState1));
-            builder.AddState(typeof(GoBackToState2));
-            builder.AddState(typeof(GoBackToState3));
-            builder.AddState(typeof(GoBackToState4));
-            builder.AddSingleton(typeof(GoBackToTestsHelper));
+            builder.RegisterStateMachine(typeof(GoBackToStateMachine), typeof(IVerifiableStateMachine));
+            builder.RegisterState(typeof(GoBackToState1));
+            builder.RegisterState(typeof(GoBackToState2));
+            builder.RegisterState(typeof(GoBackToState3));
+            builder.RegisterState(typeof(GoBackToState4));
+            builder.RegisterType(typeof(GoBackToTestsHelper), Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

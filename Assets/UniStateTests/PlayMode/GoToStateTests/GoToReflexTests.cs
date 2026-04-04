@@ -22,20 +22,20 @@ namespace UniStateTests.PlayMode.GoToStateTests
         {
             base.SetupBindings(builder);
 
-            builder.AddStateMachine(typeof(StateMachineGoToState), typeof(IVerifiableStateMachine));
-            builder.AddState(typeof(StateGoTo1));
-            builder.AddState(typeof(StateGoTo2));
-            builder.AddState(typeof(StateGoTo3));
-            builder.AddState(typeof(StateGoTo3), typeof(StateGoToAbstract3));
-            builder.AddState(typeof(StateGoTo4));
-            builder.AddState(typeof(StateGoTo5));
-            builder.AddState(typeof(CompositeStateGoTo6));
-            builder.AddState(typeof(SubStateGoTo6First));
-            builder.AddState(typeof(SubStateGoTo6Second));
-            builder.AddState(typeof(CompositeStateGoTo7));
-            builder.AddState(typeof(SubStateGoTo7First));
-            builder.AddState(typeof(SubStateGoTo7Second));
-            builder.AddState(typeof(StateGoTo8));
+            builder.RegisterStateMachine(typeof(StateMachineGoToState), typeof(IVerifiableStateMachine));
+            builder.RegisterState(typeof(StateGoTo1));
+            builder.RegisterState(typeof(StateGoTo2));
+            builder.RegisterState(typeof(StateGoTo3));
+            builder.RegisterState(typeof(StateGoTo3), typeof(StateGoToAbstract3));
+            builder.RegisterState(typeof(StateGoTo4));
+            builder.RegisterState(typeof(StateGoTo5));
+            builder.RegisterState(typeof(CompositeStateGoTo6));
+            builder.RegisterState(typeof(SubStateGoTo6First));
+            builder.RegisterState(typeof(SubStateGoTo6Second));
+            builder.RegisterState(typeof(CompositeStateGoTo7));
+            builder.RegisterState(typeof(SubStateGoTo7First));
+            builder.RegisterState(typeof(SubStateGoTo7Second));
+            builder.RegisterState(typeof(StateGoTo8));
         }
     }
 }

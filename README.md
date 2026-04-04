@@ -1189,28 +1189,30 @@ namespace Examples.Infrastructure.Reflex
 All state machines, states, and their dependencies should be registered in the DI container using Reflex's
 `ContainerBuilder`. Special extension methods have been provided for convenient registration.
 
-`AddState(typeof(MyState))` and `AddSingletonState(typeof(MyState))` register the state as itself and as all implemented
-interfaces. Use the two-parameter overload when you need to expose an additional abstract/base contract explicitly.
+`RegisterState(typeof(MyState))` registers the state as itself and as all implemented interfaces.
+Use the overload with `Lifetime.Singleton` when you need a singleton lifetime.
+Use the two-parameter overload when you need to expose an additional abstract/base contract explicitly.
 
 Here's example code demonstrating the available extension methods:
 
 ```csharp
 using Reflex.Core;
+using Reflex.Enums;
 using UniState;
 
 private void RegisterStates(ContainerBuilder builder)
 {
     // Recommended usage for general cases
 
-    builder.AddStateMachine(typeof(StateMachine), typeof(IStateMachine));
-    builder.AddState(typeof(BarState));
-    builder.AddState(typeof(BarState), typeof(BarBaseState));
+    builder.RegisterStateMachine(typeof(StateMachine), typeof(IStateMachine));
+    builder.RegisterState(typeof(BarState));
+    builder.RegisterState(typeof(BarState), typeof(BarBaseState));
     
     // Singleton version (use cautiously, not recommended in most cases)
 
-    builder.AddSingletonStateMachine(typeof(StateMachine), typeof(IStateMachine));
-    builder.AddSingletonState(typeof(BarState));
-    builder.AddSingletonState(typeof(BarState), typeof(BarBaseState));
+    builder.RegisterStateMachine(typeof(StateMachine), typeof(IStateMachine), Lifetime.Singleton);
+    builder.RegisterState(typeof(BarState), Lifetime.Singleton);
+    builder.RegisterState(typeof(BarState), typeof(BarBaseState), Lifetime.Singleton);
 }
 ```
 
