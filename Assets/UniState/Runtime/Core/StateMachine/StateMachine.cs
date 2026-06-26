@@ -71,11 +71,11 @@ namespace UniState
                     if (nextStateMetadata.BehaviourData.InitializeOnStateTransition)
                     {
                         await InitializeSafe(nextStateMetadata.State, token);
-                        await ExitAndDisposeSafe(activeStateMetadata.State, token);
+                        await ExitAndDisposeSafe(activeStateMetadata, token);
                     }
                     else
                     {
-                        await ExitAndDisposeSafe(activeStateMetadata.State, token);
+                        await ExitAndDisposeSafe(activeStateMetadata, token);
                         await InitializeSafe(nextStateMetadata.State, token);
                     }
 
@@ -86,7 +86,7 @@ namespace UniState
                     ProcessTransitionInfo(transitionInfo, activeStateMetadata.TransitionInfo, nextStateMetadata);
                 }
 
-                await ExitAndDisposeSafe(activeStateMetadata.State, token);
+                await ExitAndDisposeSafe(activeStateMetadata, token);
                 activeStateMetadata.Clear();
             }
             catch (OperationCanceledException)
@@ -191,8 +191,10 @@ namespace UniState
             }
         }
 
-        private async UniTask ExitAndDisposeSafe(IExecutableState state, CancellationToken token)
+        private async UniTask ExitAndDisposeSafe(StateWithMetadata metadata, CancellationToken token)
         {
+            var state = metadata.State;
+
             try
             {
                 token.ThrowIfCancellationRequested();
@@ -208,7 +210,7 @@ namespace UniState
             }
             finally
             {
-                state.Dispose();
+                metadata.Dispose();
             }
         }
 

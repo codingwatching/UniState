@@ -42,5 +42,6 @@ namespace UniState
 
     public sealed class EmptyPayload
     {
+        public static readonly EmptyPayload Instance = new();
     }
 }

@@ -773,7 +773,7 @@ public class ZenjectAutoBindTypeResolver : ITypeResolver
 ```
 
 If you do not have DI framework you have to implement ITypeResolver by your own by manually creating requested states and
-state machines (see [Working Without a DI Framework](#working-without-aa-di-framework).
+state machines (see [Working Without a DI Framework](#working-without-a-di-framework)).
 
 #### Working Without a DI Framework
 
@@ -793,7 +793,7 @@ An example of `ITypeResolver` without DI framework and state machine running:
 
             if (typeof(FooState) == type)
             {
-                return FooState();
+                return new FooState();
             }
 
             if (typeof(StateMachine) == type)
