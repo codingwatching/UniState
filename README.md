@@ -414,6 +414,8 @@ The lifecycle of a state consists of four stages, represented by the following m
     - Cleans up resources. If you inherit from `StateBase`, this method does not need implementation.
     - **Note:** If you inherit state from StateBase, do not override the Dispose method. Use [Disposables](#disposables)
       instead.
+    - If you manually implement `IState` or override `Dispose`, make it safe to call more than once. Some DI containers
+      may dispose resolved state instances again when their scope is disposed.
 
 #### State Transitions
 
@@ -480,7 +482,9 @@ public class ExampleState : StateBase
 #### Disposables
 
 Disposables are a part of `StateBase` that allow users to tie `IDisposable` references and delegates to state's
-lifetime, guaranteeing disposal and delegate execution on state's `Dispose`, without overriding the method
+lifetime, guaranteeing disposal and delegate execution on state's `Dispose`, without overriding the method.
+This is the recommended way to clean up resources because `StateBase` keeps disposal safe if the same state instance is
+disposed more than once by UniState and a DI container.
 
 ```csharp
 // Available API
