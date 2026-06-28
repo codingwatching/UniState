@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 
@@ -71,11 +72,11 @@ namespace UniState
                     if (nextStateMetadata.BehaviourData.InitializeOnStateTransition)
                     {
                         await InitializeSafe(nextStateMetadata.State, token);
-                        await ExitAndDisposeSafe(activeStateMetadata.State, token);
+                        await ExitAndDisposeSafe(activeStateMetadata, token);
                     }
                     else
                     {
-                        await ExitAndDisposeSafe(activeStateMetadata.State, token);
+                        await ExitAndDisposeSafe(activeStateMetadata, token);
                         await InitializeSafe(nextStateMetadata.State, token);
                     }
 
@@ -86,7 +87,7 @@ namespace UniState
                     ProcessTransitionInfo(transitionInfo, activeStateMetadata.TransitionInfo, nextStateMetadata);
                 }
 
-                await ExitAndDisposeSafe(activeStateMetadata.State, token);
+                await ExitAndDisposeSafe(activeStateMetadata, token);
                 activeStateMetadata.Clear();
             }
             catch (OperationCanceledException)
@@ -99,13 +100,36 @@ namespace UniState
             }
             finally
             {
-                nextStateMetadata.Dispose();
+                Exception disposeException = null;
+
+                try
+                {
+                    DisposeSafe(nextStateMetadata);
+                }
+                catch (Exception e)
+                {
+                    disposeException ??= e;
+                }
+
                 nextStateMetadata.Clear();
 
-                activeStateMetadata.Dispose();
+                try
+                {
+                    DisposeSafe(activeStateMetadata);
+                }
+                catch (Exception e)
+                {
+                    disposeException ??= e;
+                }
+
                 activeStateMetadata.Clear();
 
                 _isExecuting = false;
+
+                if (disposeException != null)
+                {
+                    ExceptionDispatchInfo.Capture(disposeException).Throw();
+                }
             }
         }
 
@@ -191,8 +215,10 @@ namespace UniState
             }
         }
 
-        private async UniTask ExitAndDisposeSafe(IExecutableState state, CancellationToken token)
+        private async UniTask ExitAndDisposeSafe(StateWithMetadata metadata, CancellationToken token)
         {
+            var state = metadata.State;
+
             try
             {
                 token.ThrowIfCancellationRequested();
@@ -208,7 +234,21 @@ namespace UniState
             }
             finally
             {
-                state.Dispose();
+                DisposeSafe(metadata);
+            }
+        }
+
+        private void DisposeSafe(StateWithMetadata metadata)
+        {
+            var state = metadata.State;
+
+            try
+            {
+                metadata.Dispose();
+            }
+            catch (Exception e)
+            {
+                ProcessError(new StateMachineErrorData(e, StateMachineErrorType.StateDisposing, state));
             }
         }
 

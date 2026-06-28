@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 
 namespace UniState
 {
     public class StateTransitionFactory : IStateTransitionFactory
     {
+        private static readonly Dictionary<Type, StateBehaviourData> BehaviourDataCache = new();
+
         private readonly ITypeResolver _resolver;
         private readonly IStateTransitionFacade _transitionFacade;
 
@@ -33,7 +36,7 @@ namespace UniState
         {
             var factory = new StateFactory<TState, EmptyPayload>(_resolver);
 
-            factory.Setup(new EmptyPayload(), _transitionFacade);
+            factory.Setup(EmptyPayload.Instance, _transitionFacade);
 
             return new StateTransitionInfo()
             {
@@ -57,6 +60,11 @@ namespace UniState
 
         private StateBehaviourData BuildStateBehaviourData(Type stateType)
         {
+            if (BehaviourDataCache.TryGetValue(stateType, out var cachedData))
+            {
+                return cachedData;
+            }
+
             var data = new StateBehaviourData();
 
             var attribute =
@@ -67,6 +75,8 @@ namespace UniState
                 data.ProhibitReturnToState = attribute.ProhibitReturnToState;
                 data.InitializeOnStateTransition = attribute.InitializeOnStateTransition;
             }
+
+            BehaviourDataCache[stateType] = data;
 
             return data;
         }

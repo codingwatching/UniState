@@ -3,11 +3,9 @@ using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UniState;
 using UniStateTests.Common;
-using UniStateTests.PlayMode.HistoryTests.Infrastructure;
 using UniStateTests.PlayMode.SubStateTests.Infrastructure;
 using UnityEngine.TestTools;
 using VContainer;
-using Zenject;
 
 namespace UniStateTests.PlayMode.SubStateTests
 {
@@ -18,11 +16,27 @@ namespace UniStateTests.PlayMode.SubStateTests
         public IEnumerator RunChaneOfStateSubStates_ExeptionRisedInSubState_AllSubStateDisposed() =>
             UniTask.ToCoroutine(async () => { await RunAndVerify<IVerifiableStateMachine, StateInitial>(); });
 
+        [UnityTest]
+        public IEnumerator RunCompositeState_SubStateDisposeThrows_HandlesStateDisposingError() =>
+            UniTask.ToCoroutine(async () =>
+            {
+                await RunAndVerify<IStateMachineSingleSubStateDisposeFailure, SingleDisposeFailureCompositeState>();
+            });
+
+        [UnityTest]
+        public IEnumerator RunCompositeState_MultipleSubStateDisposeThrows_HandlesAggregateStateDisposingError() =>
+            UniTask.ToCoroutine(async () =>
+            {
+                await RunAndVerify<IStateMachineMultipleSubStateDisposeFailure, MultipleDisposeFailureCompositeState>();
+            });
+
         protected override void SetupBindings(IContainerBuilder builder)
         {
             base.SetupBindings(builder);
 
             builder.RegisterStateMachine<IVerifiableStateMachine, StateMachineSubStates>();
+            builder.RegisterStateMachine<IStateMachineSingleSubStateDisposeFailure, StateMachineSingleSubStateDisposeFailure>();
+            builder.RegisterStateMachine<IStateMachineMultipleSubStateDisposeFailure, StateMachineMultipleSubStateDisposeFailure>();
 
             builder.RegisterState<StateInitial>();
             builder.RegisterState<StateFinal>();
@@ -30,6 +44,14 @@ namespace UniStateTests.PlayMode.SubStateTests
             builder.RegisterState<SubStateInitialSecond>();
             builder.RegisterState<SubStateFinalFirst>();
             builder.RegisterState<SubStateFinalSecond>();
+
+            builder.RegisterState<SingleDisposeFailureCompositeState>();
+            builder.RegisterState<SingleThrowingDisposeSubState>();
+            builder.RegisterState<SingleSuccessfulDisposeSubState>();
+            builder.RegisterState<MultipleDisposeFailureCompositeState>();
+            builder.RegisterState<MultipleFirstThrowingDisposeSubState>();
+            builder.RegisterState<MultipleSecondThrowingDisposeSubState>();
+            builder.RegisterState<MultipleSuccessfulDisposeSubState>();
         }
     }
 }

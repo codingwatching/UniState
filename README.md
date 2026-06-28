@@ -414,6 +414,8 @@ The lifecycle of a state consists of four stages, represented by the following m
     - Cleans up resources. If you inherit from `StateBase`, this method does not need implementation.
     - **Note:** If you inherit state from StateBase, do not override the Dispose method. Use [Disposables](#disposables)
       instead.
+    - If you manually implement `IState` or override `Dispose`, make it safe to call more than once. Some DI containers
+      may dispose resolved state instances again when their scope is disposed.
 
 #### State Transitions
 
@@ -480,7 +482,9 @@ public class ExampleState : StateBase
 #### Disposables
 
 Disposables are a part of `StateBase` that allow users to tie `IDisposable` references and delegates to state's
-lifetime, guaranteeing disposal and delegate execution on state's `Dispose`, without overriding the method
+lifetime, guaranteeing disposal and delegate execution on state's `Dispose`, without overriding the method.
+This is the recommended way to clean up resources because `StateBase` keeps disposal safe if the same state instance is
+disposed more than once by UniState and a DI container.
 
 ```csharp
 // Available API
@@ -676,10 +680,12 @@ public class BarStateMachine : StateMachine
 }
 ```
 
-Exceptions are first logged to the Unity Console through `Debug.LogError`, then processed internally without propagating
-further (the only exception is `OperationCanceledException`, which still stops the state machine).
+Exceptions are processed internally without propagating further (the only exception is `OperationCanceledException`,
+which still stops the state machine). By default this means logging to the Unity Console through `Debug.LogError`.
 `StateMachineErrorData` provides metadata related to exceptions, and
 `StateMachineErrorData.State` may be `null` if `StateMachineErrorType` is set to `StateMachineFail`.
+If a state or substate throws during `Dispose()`, the error is reported as `StateMachineErrorType.StateDisposing`.
+Multiple substate dispose failures are reported as an `AggregateException`.
 
 To halt state machine execution after an exception, include a `throw` statement in `HandleError()`:
 In the example provided, the state machine will terminate after encountering a second exception within the same state in a row.
@@ -773,7 +779,7 @@ public class ZenjectAutoBindTypeResolver : ITypeResolver
 ```
 
 If you do not have DI framework you have to implement ITypeResolver by your own by manually creating requested states and
-state machines (see [Working Without a DI Framework](#working-without-aa-di-framework).
+state machines (see [Working Without a DI Framework](#working-without-a-di-framework)).
 
 #### Working Without a DI Framework
 
@@ -793,7 +799,7 @@ An example of `ITypeResolver` without DI framework and state machine running:
 
             if (typeof(FooState) == type)
             {
-                return FooState();
+                return new FooState();
             }
 
             if (typeof(StateMachine) == type)

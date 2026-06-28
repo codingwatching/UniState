@@ -34,7 +34,7 @@ namespace UniStateTests.Common
         {
             _ctx ??= new CancellationTokenSource();
 
-            if (_timeoutSlim != null)
+            if (_timeoutSlim == null)
             {
                 _timeoutSlim = _ctx.CancelAfterSlim(TimeSpan.FromSeconds(TimeoutSec), DelayType.UnscaledDeltaTime);
             }

@@ -5,6 +5,7 @@ namespace UniState
         StateMachineFail,
         StateInitializing,
         StateExecuting,
-        StateExiting
+        StateExiting,
+        StateDisposing
     }
 }
