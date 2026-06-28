@@ -126,6 +126,7 @@ namespace UniStateTests.PlayMode.SubStateTests.Infrastructure
         where TState : IState<EmptyPayload>
     {
         private readonly ExecutionLogger _logger;
+        private bool _disposed;
 
         protected DisposeFailureSubState(ExecutionLogger logger)
         {
@@ -137,6 +138,13 @@ namespace UniStateTests.PlayMode.SubStateTests.Infrastructure
 
         public override void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
             base.Dispose();
             _logger.LogStep(GetType().Name, "Dispose");
             DisposeCore();
