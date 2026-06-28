@@ -23,6 +23,10 @@ pattern or be used to address specific tasks.
 * **Testability**: UniState is designed to be testable. All abstractions use interfaces that can be easily mocked with
   [NSubstitute](https://nsubstitute.github.io/) or any other framework. States can be run separately for testing
   purposes.
+* **AI development friendly**: explicit state classes, typed payloads and transitions, and DI registrations give
+  coding assistants stable architectural boundaries to follow. The
+  [mobile game architecture guide](#mobile-game-architecture-guide) provides practical patterns for implementing
+  complete Unity game flows with states, database services, popups, gameplay, and meta progression.
 * **DI friendly**: has [integration](#integrations) with most popular DI containers
 * **Continuous Testing**: fully covered by tests. All tests run [automatically](https://github.com/bazyleu/UniState/actions) to verify each change.
 
@@ -39,6 +43,21 @@ pattern or be used to address specific tasks.
 - [Framework Philosophy](#framework-philosophy)
     * [Dependency Injection](#dependency-injection)
     * [What is a State?](#what-is-a-state)
+    * [Mobile Game Architecture Guide](#mobile-game-architecture-guide)
+        + [Flow at a Glance](#flow-at-a-glance)
+        + [Architecture Rules](#architecture-rules)
+        + [Register the Flow in VContainer](#register-the-flow-in-vcontainer)
+        + [Start With One Root State](#start-with-one-root-state)
+        + [Keep Long-Lived Screens in Root States](#keep-long-lived-screens-in-root-states)
+        + [Use a Distribution State to Refresh the Hub](#use-a-distribution-state-to-refresh-the-hub)
+        + [Convert Hub UI Actions into Transitions](#convert-hub-ui-actions-into-transitions)
+        + [Pass Short-Lived Context with Payloads](#pass-short-lived-context-with-payloads)
+        + [Run Gameplay as a State, Not as the Whole App](#run-gameplay-as-a-state-not-as-the-whole-app)
+        + [Insert Between-Level Meta States](#insert-between-level-meta-states)
+        + [Use Nested State Machines for Modal Flows](#use-nested-state-machines-for-modal-flows)
+        + [Keep Persistent Progress Outside States](#keep-persistent-progress-outside-states)
+        + [Transition Choices](#transition-choices)
+        + [Short Guide Takeaway](#short-guide-takeaway)
 - [API Details and Usage](#api-details-and-usage)
     * [State](#state)
         + [State Creating](#state-creating)
@@ -204,7 +223,7 @@ All dependencies for states, commands, and other entities should be passed throu
 UniState supports automatic integration with the most popular DI frameworks for Unity.
 Refer to the [integration documentation](#integrations) for more details.
 Dependencies must be registered in your DI framework, and they will automatically be resolved when
-creating [state](#state), [state machine](#state-machine).
+creating a [state](#state) or [state machine](#state-machine).
 
 ### What is a State?
 
@@ -214,17 +233,17 @@ separate `GameplayState`. When the user opens a shop popup, they may transition 
 not always tied to visual elements. Some states, like `GameLoadingState`, may handle background processes such as
 loading resources.
 
-State class contains all logic related to that state including loading and unloading resources. UniState does not restrict the use of other
+A state class contains all logic related to that state, including loading and unloading resources. UniState does not restrict the use of other
 frameworks or patterns, meaning you can freely use whatever suits your needs. You could, for example, run controllers
-and follow an MVC approach, follow MVVM approach, or even execute ECS code within a state.
+and follow an MVC approach, follow an MVVM approach, or even execute ECS code within a state.
 
 The key concept of the framework is that once a state is exited, all resources it allocated should be released. For
-details on how to do this see [Disposables](#disposables).
+details on how to do this, see [Disposables](#disposables).
 
 It is not recommended to use Unity GameObjects directly inside states, as it reduces testability and increases code
 coupling. A better approach is to load GameObjects through an abstraction and use them as an interface (essentially as a
-View in UniState). Add a handler for unloading to the Disposables of the state that loaded it. All approaches / patterns
-which were mentioned above support this, and you can choose any based on your preferences, as this functionality is
+View in UniState). Add a handler for unloading to the Disposables of the state that loaded it. All approaches and patterns
+mentioned above support this, and you can choose any based on your preferences, as this functionality is
 outside the scope of UniState.
 
 ```csharp
@@ -272,7 +291,7 @@ outside the scope of UniState.
 ```
 
 If the popup is complex with multiple features, it could be represented as its own state machine. 
-In cases where you have a complex popup with its own state machine, it’s important to allocate resources specific to the popup before launching the separate
+In cases where you have a complex popup with its own state machine, it is important to allocate resources specific to the popup before launching the separate
 state machine, ensuring they are properly cleaned up after the state machine exits.
 
 ```csharp
@@ -328,6 +347,558 @@ state machine, ensuring they are properly cleaned up after the state machine exi
     }
 ```
 
+
+### Mobile Game Architecture Guide
+
+This guide shows how to structure a larger Unity mobile game with UniState: a boot flow, a hub screen,
+gameplay levels, between-level rewards, popups, and a meta progression feature such as building a base, upgrading
+a headquarters, restoring a town, unlocking an area, or decorating a room.
+
+The examples are intentionally generic. They use ordinary project-owned types such as `GameDatabase`,
+`IAssetLoader<T>`, `HubView`, and `ILevelController`. These are not required UniState APIs. Replace them with your own
+data services, Addressables loaders, UI views, and gameplay services. UniState's job is to own the lifecycle and
+transitions between those parts.
+
+For the snippets below, assume that loaders own the loaded resources and release them when disposed:
+
+```csharp
+using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+
+public interface IAssetLoader<T> : IDisposable
+{
+    UniTask<T> InstantiateAsync(CancellationToken token);
+}
+```
+
+#### Flow at a Glance
+
+A typical mobile game flow can be modeled as a nested list of small, explicit states:
+
+- `GameEntryPoint` starts `AppRootState`.
+- `AppRootState` loads the app shell and runs `HubRootState`.
+- `HubRootState` loads the hub screen and runs `HubDistributionState`.
+- `HubDistributionState` refreshes the hub, then chooses:
+  - `ClaimRunRewardState` if a previous run has an unclaimed reward.
+  - `HubIdleState` otherwise.
+- `HubIdleState` waits for one hub action, then chooses:
+  - `RunSetupState -> LoadoutState -> LevelIntroState -> LevelState` for gameplay.
+  - `BuildMetaState -> MetaCompleteState -> NewAreaRevealState` for long-term progression.
+  - `SettingsPopupState`, `ShopPopupState`, or `AreaInfoPopupState` for modal hub actions.
+- `LevelState` can route to:
+  - `LevelWinPopupState -> LevelIntroState` after a completed non-final level.
+  - `HubDistributionState` when the run ends.
+
+The important idea is not the exact names. The important idea is that every state owns one clear part of the game:
+
+| State kind | Responsibility |
+|------------|----------------|
+| Root state | Load long-lived app or feature resources, then run a child flow. |
+| Distribution state | Refresh shared UI from persistent data and choose the next state. |
+| Idle state | Wait for user actions on an already loaded screen and convert them into transitions. |
+| Popup state | Load one temporary view, wait for an action, update data if needed, then return or route forward. |
+| Gameplay state | Own the level lifecycle and delegate rules to gameplay services or commands. |
+| Between-level state | Apply rewards, upgrades, shops, or choices between gameplay levels. |
+| Meta state | Spend persistent resources and update long-term progression. |
+
+#### Architecture Rules
+
+Use these rules when deciding where code should live:
+
+1. A state owns a phase of the game, not the entire game.
+2. A state should decide when a phase starts, what temporary resources are loaded, what user action completes the phase,
+   and what transition follows.
+3. Durable progress should live in a database or services, not in state fields.
+4. UI views should expose actions such as `WaitForClose`, `WaitForSelection`, or `WaitForInput`. Views should not
+   decide UniState transitions directly.
+5. Gameplay rules should live in services, command objects, ECS systems, or another domain layer. The gameplay state
+   starts them, observes completion, and transitions.
+6. Add loaded views, Addressables handles, event subscriptions, and cancellation sources to `Disposables`.
+7. Use nested state machines when a parent state must keep its view alive while a child popup or child flow runs.
+8. Return to a distribution state after the database changes and the hub must be refreshed.
+
+#### Register the Flow in VContainer
+
+The VContainer `LifetimeScope` is the composition root. Register the entry point, long-lived services, state machine,
+states, and your project-specific loaders here.
+
+```csharp
+using UniState;
+using VContainer;
+using VContainer.Unity;
+
+public sealed class GameLifetimeScope : LifetimeScope
+{
+    protected override void Configure(IContainerBuilder builder)
+    {
+        builder.RegisterEntryPoint<GameEntryPoint>();
+
+        builder.Register<GameDatabase>(Lifetime.Singleton);
+        builder.Register<AudioService>(Lifetime.Singleton)
+            .AsImplementedInterfaces();
+        builder.Register<LevelController>(Lifetime.Transient)
+            .AsImplementedInterfaces();
+        builder.Register<RewardGenerator>(Lifetime.Transient)
+            .AsImplementedInterfaces();
+
+        builder.RegisterStateMachine<IStateMachine, GameStateMachine>();
+
+        builder.RegisterState<AppRootState>();
+        builder.RegisterState<HubRootState>();
+        builder.RegisterState<HubDistributionState>();
+        // ...
+
+        // Project-specific loading. Use Addressables, Resources, scene references,
+        // or any loader abstraction that fits your game.
+        builder.Register<IAssetLoader<RootCanvasView>, RootCanvasLoader>(Lifetime.Transient);
+        builder.Register<IAssetLoader<HubView>, HubLoader>(Lifetime.Transient);
+        // ...
+    }
+}
+```
+
+You can use the built-in `StateMachine` directly, or derive from it if the game needs custom error handling.
+
+```csharp
+using UniState;
+using UnityEngine;
+
+public sealed class GameStateMachine : StateMachine
+{
+    protected override void HandleError(StateMachineErrorData errorData)
+    {
+        Debug.LogError(errorData.Exception);
+    }
+}
+```
+
+In general, register states and state machines as transient. A state machine can run only one execution flow at a time,
+so nested flows should receive a separate machine instance. The default VContainer `RegisterStateMachine` overload uses
+transient lifetime.
+
+#### Start With One Root State
+
+The entry point is the bridge from Unity/VContainer startup into UniState. Keep it small: resolve a state machine and
+start one root state.
+
+```csharp
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UniState;
+using VContainer.Unity;
+
+public sealed class GameEntryPoint : IStartable
+{
+    private readonly IStateMachine _stateMachine;
+
+    public GameEntryPoint(IStateMachine stateMachine)
+    {
+        _stateMachine = stateMachine;
+    }
+
+    public void Start()
+    {
+        _stateMachine.Execute<AppRootState>(CancellationToken.None).Forget();
+    }
+}
+```
+
+`CancellationToken.None` is fine for a minimal sample. In a production project, you can pass an application-level
+token that is cancelled on scene unload, logout, or app shutdown.
+
+#### Keep Long-Lived Screens in Root States
+
+Root states load resources that should survive many smaller states. For example, the app root can load the root canvas,
+initialize audio, and then run the hub flow as a nested state machine.
+
+```csharp
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UniState;
+
+public sealed class AppRootState : StateBase
+{
+    private readonly IAssetLoader<RootCanvasView> _rootCanvasLoader;
+    private readonly IStateMachine _hubMachine;
+
+    public AppRootState(
+        IAssetLoader<RootCanvasView> rootCanvasLoader,
+        IStateMachine hubMachine)
+    {
+        _rootCanvasLoader = rootCanvasLoader;
+        _hubMachine = hubMachine;
+    }
+
+    public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        Disposables.Add(_rootCanvasLoader);
+
+        await _rootCanvasLoader.InstantiateAsync(token);
+        await _hubMachine.Execute<HubRootState>(token);
+
+        return Transition.GoToExit();
+    }
+}
+```
+
+The hub root can load the hub screen and environment once, store them in holders, subscribe to shared events, and then
+run hub substates.
+
+```csharp
+public sealed class HubRootState : StateBase
+{
+    private readonly IAssetLoader<HubView> _hubLoader;
+    private readonly HubViewHolder _hubViewHolder;
+    private readonly IStateMachine _hubMachine;
+
+    public HubRootState(
+        IAssetLoader<HubView> hubLoader,
+        HubViewHolder hubViewHolder,
+        IStateMachine hubMachine)
+    {
+        _hubLoader = hubLoader;
+        _hubViewHolder = hubViewHolder;
+        _hubMachine = hubMachine;
+    }
+
+    public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        Disposables.Add(_hubLoader);
+
+        var hubView = await _hubLoader.InstantiateAsync(token);
+        _hubViewHolder.Initialize(hubView);
+
+        await _hubMachine.Execute<HubDistributionState>(token);
+
+        return Transition.GoToExit();
+    }
+}
+```
+
+This pattern prevents every popup or menu state from loading the hub again. The smaller states can work with
+`HubViewHolder` and persistent data services.
+
+#### Use a Distribution State to Refresh the Hub
+
+A distribution state is a lightweight routing state. It refreshes shared UI from durable data, then immediately returns
+the next transition.
+
+```csharp
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UniState;
+
+public sealed class HubDistributionState : StateBase
+{
+    private readonly GameDatabase _database;
+    private readonly HubViewHolder _hub;
+
+    public HubDistributionState(GameDatabase database, HubViewHolder hub)
+    {
+        _database = database;
+        _hub = hub;
+    }
+
+    public override UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        _hub.SetVisible(true);
+
+        var transition = _database.HasPendingReward
+            ? Transition.GoTo<ClaimRunRewardState>()
+            : Transition.GoTo<HubIdleState>();
+
+        return UniTask.FromResult(transition);
+    }
+}
+```
+
+Many states can return to this one place after they change persistent data:
+
+- A shop state returns after buying currency.
+- A settings state returns after changing options.
+- A meta build state returns after spending resources.
+- A gameplay state returns after ending a run.
+- A reward claim state returns after clearing pending rewards.
+
+This keeps "refresh hub UI" logic out of every feature state.
+
+#### Convert Hub UI Actions into Transitions
+
+An idle state waits for possible player actions on an already visible screen. It turns the first completed action into a
+transition.
+
+```csharp
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UniState;
+
+public enum HubInput
+{
+    Play,
+    Build,
+    Shop,
+    Settings,
+    AreaInfo
+}
+
+public sealed class HubIdleState : StateBase
+{
+    private readonly HubViewHolder _hub;
+
+    public HubIdleState(HubViewHolder hub)
+    {
+        _hub = hub;
+    }
+
+    public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        var input = await _hub.View.WaitForInput(token);
+
+        switch (input)
+        {
+            case HubInput.Play:
+                return Transition.GoTo<RunSetupState>();
+
+            case HubInput.Build:
+                return Transition.GoTo<BuildMetaState>();
+
+            case HubInput.Shop:
+                return Transition.GoTo<ShopPopupState>();
+
+            case HubInput.Settings:
+                return Transition.GoTo<SettingsPopupState>();
+
+            case HubInput.AreaInfo:
+                return Transition.GoTo<AreaInfoPopupState>();
+
+            default:
+                return Transition.GoTo<HubDistributionState>();
+        }
+    }
+}
+```
+
+The view can race buttons, gestures, or platform input internally and return one `HubInput`. The state owns the mapping
+from input to transitions.
+
+After the player presses Play, a setup state usually writes the selected run configuration into the database and moves to a
+loadout, deck-building, or loading state.
+
+#### Pass Short-Lived Context with Payloads
+
+Use `StateBase<TPayload>` for data that belongs to one transition. For example, a level intro state can decide whether
+the next level should run in the current game mode.
+
+```csharp
+public enum GameMode
+{
+    Normal,
+    Assisted
+}
+
+public sealed class LevelPayload
+{
+    public GameMode Mode { get; }
+
+    public LevelPayload(GameMode mode)
+    {
+        Mode = mode;
+    }
+}
+```
+
+```csharp
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UniState;
+
+public sealed class LevelIntroState : StateBase
+{
+    private readonly GameDatabase _database;
+
+    public LevelIntroState(GameDatabase database)
+    {
+        _database = database;
+    }
+
+    public override UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        _database.AdvanceLevel();
+        var payload = new LevelPayload(_database.Mode);
+
+        return UniTask.FromResult(
+            Transition.GoTo<LevelState, LevelPayload>(payload));
+    }
+}
+```
+
+Good payloads are one-time parameters: selected difficulty, game mode, popup reason, selected item id. Persistent data
+such as currencies, inventory, current run deck, and meta progress should live in the database.
+
+#### Run Gameplay as a State, Not as the Whole App
+
+The gameplay state owns the level lifecycle. It should not contain every rule in the game. Delegate gameplay rules to
+a domain service, command engine, ECS world, or another testable layer.
+
+```csharp
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UniState;
+
+public enum LevelResult
+{
+    Completed,
+    Exited
+}
+
+public sealed class LevelState : StateBase<LevelPayload>
+{
+    private readonly GameDatabase _database;
+    private readonly ILevelController _levelController;
+
+    public LevelState(
+        GameDatabase database,
+        ILevelController levelController)
+    {
+        _database = database;
+        _levelController = levelController;
+    }
+
+    public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        var result = await _levelController.RunAsync(_database, Payload, token);
+
+        if (result == LevelResult.Exited)
+        {
+            _database.MarkRunRewardPending();
+            return Transition.GoTo<HubDistributionState>();
+        }
+
+        _database.SaveLevelResult(result);
+
+        if (_database.IsFinalLevel)
+        {
+            _database.MarkRunRewardPending();
+            return Transition.GoTo<HubDistributionState>();
+        }
+
+        return Transition.GoTo<NextLevelState>();
+    }
+}
+```
+
+This state decides the flow around gameplay:
+
+- Start the level.
+- Run the level.
+- Save the result.
+- Open a nested win popup for a completed non-final level.
+- Go to a reward draft between levels.
+- Return to the hub when the run ends.
+
+The card rules, enemy behavior, physics, or puzzle logic stay in `ILevelController` or another domain layer.
+
+#### Insert Between-Level Meta States
+
+Between-level states are where many mobile games grow their depth: reward drafts, shops, healing screens, upgrade
+choices, narrative events, or ad offers. The previous level should not know the details of these systems. It only
+transitions to the next state.
+
+The next level reads updated run data from the database. This makes the loop easy to extend:
+
+```text
+LevelState -> RewardDraftState -> LevelIntroState -> LevelState
+LevelState -> ShopBetweenLevelsState -> LevelIntroState -> LevelState
+LevelState -> HealOrUpgradeState -> LevelIntroState -> LevelState
+```
+
+#### Use Nested State Machines for Modal Flows
+
+Nested state machines are useful when a parent state must remain active while a child flow runs. For example, a "new
+area unlocked" popup can keep its reveal view alive while it opens a reusable area-info popup.
+
+The reusable popup state stays simple:
+
+```csharp
+public sealed class AreaInfoPopupState : StateBase
+{
+    private readonly IAssetLoader<AreaInfoView> _areaInfoLoader;
+    private readonly GameDatabase _database;
+
+    public AreaInfoPopupState(
+        IAssetLoader<AreaInfoView> areaInfoLoader,
+        GameDatabase database)
+    {
+        _areaInfoLoader = areaInfoLoader;
+        _database = database;
+    }
+
+    public override UniTask Initialize(CancellationToken token)
+    {
+        Disposables.Add(_areaInfoLoader);
+        return UniTask.CompletedTask;
+    }
+
+    public override async UniTask<StateTransitionInfo> Execute(CancellationToken token)
+    {
+        var view = await _areaInfoLoader.InstantiateAsync(token);
+        view.Initialize(_database.CurrentArea);
+
+        await view.WaitForClose(token);
+
+        return Transition.GoBack();
+    }
+}
+```
+
+`AreaInfoPopupState` can be opened from the hub, from the reveal popup, or from another flow. The parent decides where
+the flow continues.
+
+If the parent view must stay alive, prefer this nested-machine pattern over relying on `GoBack()` to preserve the same
+C# state instance. `GoBack()` returns through state-machine history, but the previous state is resolved again through
+the configured container.
+
+#### Keep Persistent Progress Outside States
+
+States are transient. They can be disposed, recreated, skipped by history rules, or run inside nested flows. Store
+progress that must survive the state in a database or a service.
+
+Good state fields:
+
+- Current view instance.
+- Completion source.
+- Temporary selected option.
+- Local cancellation source.
+- Animation handles.
+
+Good database data:
+
+- Player currencies.
+- Inventory.
+- Current run deck or loadout.
+- Current level number.
+- Pending rewards.
+- Meta progression.
+- Settings.
+
+#### Transition Choices
+
+Use these transitions for the common routing cases:
+
+| Situation | Transition |
+|-----------|------------|
+| Move to the next known phase | `Transition.GoTo<NextState>()` |
+| Move to a state with one-time data | `Transition.GoTo<NextState, Payload>(payload)` |
+| Close a temporary modal and return to history | `Transition.GoBack()` |
+| Return to a specific previous state | `Transition.GoBackTo<TState>()` |
+| Finish a nested flow | `Transition.GoToExit()` |
+| Refresh hub after data changes | `Transition.GoTo<HubDistributionState>()` |
+
+#### Short Guide Takeaway
+
+If a reader follows only one rule from this guide, make it this one: keep state classes responsible for flow and
+lifetime, keep durable data in a database or services, and keep reusable game rules outside the state.
 
 ## API Details and Usage
 
