@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 
@@ -99,13 +100,36 @@ namespace UniState
             }
             finally
             {
-                nextStateMetadata.Dispose();
+                Exception disposeException = null;
+
+                try
+                {
+                    DisposeSafe(nextStateMetadata);
+                }
+                catch (Exception e)
+                {
+                    disposeException ??= e;
+                }
+
                 nextStateMetadata.Clear();
 
-                activeStateMetadata.Dispose();
+                try
+                {
+                    DisposeSafe(activeStateMetadata);
+                }
+                catch (Exception e)
+                {
+                    disposeException ??= e;
+                }
+
                 activeStateMetadata.Clear();
 
                 _isExecuting = false;
+
+                if (disposeException != null)
+                {
+                    ExceptionDispatchInfo.Capture(disposeException).Throw();
+                }
             }
         }
 
@@ -210,7 +234,21 @@ namespace UniState
             }
             finally
             {
+                DisposeSafe(metadata);
+            }
+        }
+
+        private void DisposeSafe(StateWithMetadata metadata)
+        {
+            var state = metadata.State;
+
+            try
+            {
                 metadata.Dispose();
+            }
+            catch (Exception e)
+            {
+                ProcessError(new StateMachineErrorData(e, StateMachineErrorType.StateDisposing, state));
             }
         }
 

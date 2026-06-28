@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using UnityEngine;
 
 namespace UniState
 {
@@ -87,6 +87,8 @@ namespace UniState
 
         public void Dispose()
         {
+            List<Exception> exceptions = null;
+
             for (var i = 0; i < _subStates.Count; i++)
             {
                 try
@@ -95,10 +97,22 @@ namespace UniState
                 }
                 catch (Exception e)
                 {
-                    // How to log? Do we need log?
-                    Debug.LogException(e);
+                    exceptions ??= new List<Exception>();
+                    exceptions.Add(e);
                 }
             }
+
+            if (exceptions == null)
+            {
+                return;
+            }
+
+            if (exceptions.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+            }
+
+            throw new AggregateException("One or more substate dispose operations failed.", exceptions);
         }
     }
 }

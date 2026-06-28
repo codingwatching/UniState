@@ -676,10 +676,12 @@ public class BarStateMachine : StateMachine
 }
 ```
 
-Exceptions are first logged to the Unity Console through `Debug.LogError`, then processed internally without propagating
-further (the only exception is `OperationCanceledException`, which still stops the state machine).
+Exceptions are processed internally without propagating further (the only exception is `OperationCanceledException`,
+which still stops the state machine). By default this means logging to the Unity Console through `Debug.LogError`.
 `StateMachineErrorData` provides metadata related to exceptions, and
 `StateMachineErrorData.State` may be `null` if `StateMachineErrorType` is set to `StateMachineFail`.
+If a state or substate throws during `Dispose()`, the error is reported as `StateMachineErrorType.StateDisposing`.
+Multiple substate dispose failures are reported as an `AggregateException`.
 
 To halt state machine execution after an exception, include a `throw` statement in `HandleError()`:
 In the example provided, the state machine will terminate after encountering a second exception within the same state in a row.
