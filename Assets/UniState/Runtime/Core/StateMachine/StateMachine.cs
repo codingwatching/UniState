@@ -39,6 +39,10 @@ namespace UniState
         protected virtual StateTransitionInfo BuildRecoveryTransition(IStateTransitionFactory transitionFactory) =>
             transitionFactory.CreateBackTransition();
 
+        protected virtual void HandleStateChanged(StateMachineStateChangedData changeData)
+        {
+        }
+
         private void Initialize()
         {
             _history = new LimitedStack<StateTransitionInfo>(MaxHistorySize);
@@ -58,6 +62,13 @@ namespace UniState
             var nextStateMetadata = new StateWithMetadata();
 
             activeStateMetadata.BuildState(initialTransition, initialTransition.StateBehaviourData);
+            ProcessStateChanged(new StateMachineStateChangedData(
+                null,
+                activeStateMetadata.State,
+                null,
+                activeStateMetadata.TransitionInfo,
+                initialTransition,
+                StateMachineStateChangeType.Started));
 
             try
             {
@@ -69,6 +80,9 @@ namespace UniState
 
                 while (!nextStateMetadata.IsEmpty && !token.IsCancellationRequested)
                 {
+                    var previousState = activeStateMetadata.State;
+                    var previousTransition = activeStateMetadata.TransitionInfo;
+
                     if (nextStateMetadata.BehaviourData.InitializeOnStateTransition)
                     {
                         await InitializeSafe(nextStateMetadata.State, token);
@@ -81,13 +95,30 @@ namespace UniState
                     }
 
                     activeStateMetadata.CopyData(nextStateMetadata);
+                    ProcessStateChanged(new StateMachineStateChangedData(
+                        previousState,
+                        activeStateMetadata.State,
+                        previousTransition,
+                        activeStateMetadata.TransitionInfo,
+                        transitionInfo,
+                        StateMachineStateChangeType.Changed));
 
                     transitionInfo = await ExecuteSafe(activeStateMetadata.State, token);
 
                     ProcessTransitionInfo(transitionInfo, activeStateMetadata.TransitionInfo, nextStateMetadata);
                 }
 
+                var exitedState = activeStateMetadata.State;
+                var exitedTransition = activeStateMetadata.TransitionInfo;
+
                 await ExitAndDisposeSafe(activeStateMetadata, token);
+                ProcessStateChanged(new StateMachineStateChangedData(
+                    exitedState,
+                    null,
+                    exitedTransition,
+                    null,
+                    transitionInfo,
+                    StateMachineStateChangeType.Exited));
                 activeStateMetadata.Clear();
             }
             catch (OperationCanceledException)
@@ -253,5 +284,7 @@ namespace UniState
         }
 
         private void ProcessError(StateMachineErrorData errorData) => HandleError(errorData);
+
+        private void ProcessStateChanged(StateMachineStateChangedData changeData) => HandleStateChanged(changeData);
     }
 }
