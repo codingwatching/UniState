@@ -65,15 +65,16 @@ namespace UniState
             try
             {
                 activeStateMetadata.BuildState(initialTransition, initialTransition.StateBehaviourData);
+
+                await InitializeSafe(activeStateMetadata.State, token);
+
                 ProcessStateChanged(new StateMachineStateChangedData(
                     null,
-                    activeStateMetadata.State,
+                    activeStateMetadata.TransitionInfo.Creator?.StateType,
                     null,
                     activeStateMetadata.TransitionInfo,
                     initialTransition,
                     StateMachineStateChangeType.Started));
-
-                await InitializeSafe(activeStateMetadata.State, token);
 
                 transitionInfo = await ExecuteSafe(activeStateMetadata.State, token);
 
@@ -81,7 +82,6 @@ namespace UniState
 
                 while (!nextStateMetadata.IsEmpty && !token.IsCancellationRequested)
                 {
-                    var previousState = activeStateMetadata.State;
                     var previousTransition = activeStateMetadata.TransitionInfo;
 
                     if (nextStateMetadata.BehaviourData.InitializeOnStateTransition)
@@ -96,9 +96,11 @@ namespace UniState
                     }
 
                     activeStateMetadata.CopyData(nextStateMetadata);
+                    nextStateMetadata.Clear();
+
                     ProcessStateChanged(new StateMachineStateChangedData(
-                        previousState,
-                        activeStateMetadata.State,
+                        previousTransition.Creator?.StateType,
+                        activeStateMetadata.TransitionInfo.Creator?.StateType,
                         previousTransition,
                         activeStateMetadata.TransitionInfo,
                         transitionInfo,
@@ -109,12 +111,12 @@ namespace UniState
                     ProcessTransitionInfo(transitionInfo, activeStateMetadata.TransitionInfo, nextStateMetadata);
                 }
 
-                var exitedState = activeStateMetadata.State;
                 var exitedTransition = activeStateMetadata.TransitionInfo;
 
                 await ExitAndDisposeSafe(activeStateMetadata, token);
+
                 ProcessStateChanged(new StateMachineStateChangedData(
-                    exitedState,
+                    exitedTransition.Creator?.StateType,
                     null,
                     exitedTransition,
                     null,

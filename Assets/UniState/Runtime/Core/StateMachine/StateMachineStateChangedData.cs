@@ -1,24 +1,26 @@
+using System;
+
 namespace UniState
 {
-    public sealed class StateMachineStateChangedData
+    public readonly struct StateMachineStateChangedData
     {
-        public IExecutableState PreviousState { get; }
-        public IExecutableState CurrentState { get; }
+        public Type PreviousStateType { get; }
+        public Type CurrentStateType { get; }
         public StateTransitionInfo PreviousTransition { get; }
         public StateTransitionInfo CurrentTransition { get; }
         public StateTransitionInfo RequestedTransition { get; }
         public StateMachineStateChangeType ChangeType { get; }
 
         public StateMachineStateChangedData(
-            IExecutableState previousState,
-            IExecutableState currentState,
+            Type previousStateType,
+            Type currentStateType,
             StateTransitionInfo previousTransition,
             StateTransitionInfo currentTransition,
             StateTransitionInfo requestedTransition,
             StateMachineStateChangeType changeType)
         {
-            PreviousState = previousState;
-            CurrentState = currentState;
+            PreviousStateType = previousStateType;
+            CurrentStateType = currentStateType;
             PreviousTransition = previousTransition;
             CurrentTransition = currentTransition;
             RequestedTransition = requestedTransition;
