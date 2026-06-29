@@ -60,21 +60,22 @@ namespace UniState
 
             var activeStateMetadata = new StateWithMetadata();
             var nextStateMetadata = new StateWithMetadata();
-
-            activeStateMetadata.BuildState(initialTransition, initialTransition.StateBehaviourData);
-            ProcessStateChanged(new StateMachineStateChangedData(
-                null,
-                activeStateMetadata.State,
-                null,
-                activeStateMetadata.TransitionInfo,
-                initialTransition,
-                StateMachineStateChangeType.Started));
+            StateTransitionInfo transitionInfo = null;
 
             try
             {
+                activeStateMetadata.BuildState(initialTransition, initialTransition.StateBehaviourData);
+                ProcessStateChanged(new StateMachineStateChangedData(
+                    null,
+                    activeStateMetadata.State,
+                    null,
+                    activeStateMetadata.TransitionInfo,
+                    initialTransition,
+                    StateMachineStateChangeType.Started));
+
                 await InitializeSafe(activeStateMetadata.State, token);
 
-                var transitionInfo = await ExecuteSafe(activeStateMetadata.State, token);
+                transitionInfo = await ExecuteSafe(activeStateMetadata.State, token);
 
                 ProcessTransitionInfo(transitionInfo, activeStateMetadata.TransitionInfo, nextStateMetadata);
 

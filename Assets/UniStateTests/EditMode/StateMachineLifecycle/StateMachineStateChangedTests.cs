@@ -66,6 +66,19 @@ namespace UniStateTests.EditMode.StateMachineLifecycle
             Assert.IsNull(stateMachine.Changes[3].CurrentState);
         }
 
+        [Test]
+        public void Execute_WhenStateChangedHandlerThrows_ClearsExecutionStatus()
+        {
+            var stateMachine = new ThrowingStateChangedStateMachine();
+            stateMachine.SetResolver(new TestResolver());
+
+            stateMachine.Execute<FirstState>(CancellationToken.None).GetAwaiter().GetResult();
+
+            Assert.False(stateMachine.IsExecuting);
+            Assert.NotNull(stateMachine.LastError);
+            Assert.AreEqual(StateMachineErrorType.StateMachineFail, stateMachine.LastError.ErrorType);
+        }
+
         private sealed class TrackingStateMachine : StateMachine
         {
             public readonly List<StateMachineStateChangedData> Changes = new();
@@ -78,6 +91,21 @@ namespace UniStateTests.EditMode.StateMachineLifecycle
             protected override void HandleError(StateMachineErrorData errorData)
             {
                 throw new Exception("State machine error.", errorData.Exception);
+            }
+        }
+
+        private sealed class ThrowingStateChangedStateMachine : StateMachine
+        {
+            public StateMachineErrorData LastError { get; private set; }
+
+            protected override void HandleStateChanged(StateMachineStateChangedData changeData)
+            {
+                throw new InvalidOperationException("State changed handler failure.");
+            }
+
+            protected override void HandleError(StateMachineErrorData errorData)
+            {
+                LastError = errorData;
             }
         }
 
