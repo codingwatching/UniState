@@ -70,6 +70,7 @@ pattern or be used to address specific tasks.
         + [Running a State Machine](#running-a-state-machine)
         + [Launching Nested State Machines](#launching-nested-state-machines)
         + [State Machine History](#state-machine-history)
+        + [State Machine State Change Hook](#state-machine-state-change-hook)
         + [State Machine Error Handling](#state-machine-error-handling)
             - [General Error-Handling Principles](#general-error-handling-principles)
             - [State Machine Specific Exceptions](#state-machine-specific-exceptions)
@@ -1229,6 +1230,41 @@ public class StateMachineWithDisabledHistory : StateMachine
     protected override int MaxHistorySize => 0;
 }
 ```
+
+#### State Machine State Change Hook
+
+Override `HandleStateChanged()` when a custom state machine needs to observe high-level state machine movement, for
+example to report analytics, update debug UI, or build a lightweight execution trace.
+
+```csharp
+public class ObservedStateMachine : StateMachine
+{
+    protected override void HandleStateChanged(StateMachineStateChangedData changeData)
+    {
+        Debug.Log(
+            $"{changeData.ChangeType}: " +
+            $"{changeData.PreviousStateType?.Name ?? "None"} -> " +
+            $"{changeData.CurrentStateType?.Name ?? "None"}");
+    }
+}
+```
+
+The hook receives `StateMachineStateChangedData` with the following data:
+
+* `ChangeType` - `Started`, `Changed`, or `Exited`.
+* `PreviousStateType` and `CurrentStateType` - state types before and after the change. One side is `null` when the state
+  machine starts or exits.
+* `PreviousTransition` and `CurrentTransition` - transition metadata for the previous and current state.
+* `RequestedTransition` - the transition returned by the state that caused this change.
+
+`Started` is reported after the initial state's `Initialize()` completes and before its `Execute()` starts. `Changed` is
+reported after the previous state has exited and disposed and after the current state has initialized. `Exited` is
+reported after the last state has exited and disposed.
+
+`StateMachineStateChangedData` is a readonly value type and contains state types rather than state instances. This keeps
+the hook lightweight and prevents observers from accidentally keeping disposed states alive. If the hook throws an
+exception, the state machine reports it through `HandleError()` as `StateMachineErrorType.StateMachineFail` and still
+performs cleanup.
 
 #### State Machine Error Handling
 
